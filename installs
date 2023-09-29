@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+import argparse
+import subprocess
+import sys
+import os
+from termcolor import colored
+
+def get_terminal_width():
+    return os.get_terminal_size().columns
+
+def print_centered_in_frame(text, color):
+    width = get_terminal_width() - 2  # Subtracting 2 for the side borders
+    padding = (width - len(text)) // 2
+    top_border = colored("╭" + "─" * (width) + "╮", "blue", attrs=['bold'])
+    bottom_border = colored("╰" + "─" * (width) + "╯", "blue", attrs=['bold'])
+    side_border = colored("│", "blue", attrs=['bold'])
+    print(f"\n{top_border}\n{side_border}{colored(' ' * padding + text + ' ' * padding, color, attrs=['bold'])}{side_border}\n{bottom_border}\n")
+
+def execute_command(cmd, force=False):
+    try:
+        print_centered_in_frame(f"🚀 Executing: {cmd}", "yellow")
+        subprocess.run(cmd, shell=True, check=True)
+        print_centered_in_frame("✅ Success!", "green")
+        return True
+    except subprocess.CalledProcessError as e:
+        print_centered_in_frame(f"❌ Command failed: {e}", "red")
+        return force  # If force is True, continue despite the error
+
+def install_or_search(package_names, flags, action, search_everywhere, force, update, clean):
+    package_managers = [
+        {"name": "nala", "install": "install", "search": "search", "update": "update ; sudo nala upgrade -y", "clean": "clean", "yes_flag": "-y"},
+        {"name": "snap", "install": "install", "search": "find", "update": "refresh", "clean": None, "yes_flag": None},
+        {"name": "flatpak", "install": "install", "search": "search", "update -y": "update", "clean": None, "yes_flag": "-y"}
+    ]
+
+    packages_str = ' '.join(package_names)
+    success = False
+
+    for pm in package_managers:
+        if update:
+            update_cmd = f"updates -pusf"
+            execute_command(update_cmd, force)
+
+        cmd_flags = pm["yes_flag"] if flags and pm["yes_flag"] else ""
+        cmd = f"sudo {pm['name']} {pm[action]} {cmd_flags} {packages_str}"
+        if execute_command(cmd, force):
+            success = True
+            if not search_everywhere:
+                break
+
+        if clean and pm['clean']:
+            clean_cmd = f"sudo {pm['name']} {pm['clean']}"
+            execute_command(clean_cmd, force)
+
+    return success
+
+def main():
+    print_centered_in_frame("Package Installer & Searcher", "yellow")
+    
+    parser = argparse.ArgumentParser(description=colored("Install or search for packages using various package managers.", "blue", attrs=['bold']))
+    parser.add_argument("package_names", nargs='+', help="Name(s) of the package(s).")
+    parser.add_argument("-y", help="Automatically say yes to prompts.", action="store_true")
+    parser.add_argument("-s", help="Search for the package instead of installing.", action="store_true")
+    parser.add_argument("-e", help="Search everywhere regardless of earlier results.", action="store_true")
+    parser.add_argument("-u", help="Update and upgrade package lists before installing.", action="store_true")
+    parser.add_argument("-f", help="Force installation or removal, ignoring errors.", action="store_true")
+    parser.add_argument("-c", help="Clean up cache after installation.", action="store_true")
+
+    args = parser.parse_args()
+    flags = "-y" if args.y else ""
+    action = "search" if args.s else "install"
+    search_everywhere = args.e
+    force = args.f
+    update = args.u
+    clean = args.c
+
+    print_centered_in_frame(f"🎯 Action: {action.capitalize()}", "cyan")
+    print_centered_in_frame(f"📦 Package(s): {', '.join(args.package_names)}", "cyan")
+
+    success = install_or_search(args.package_names, flags, action, search_everywhere, force, update, clean)
+    if not success:
+        print_centered_in_frame(f"❌ Error: Could not {action} {', '.join(args.package_names)}.", "red")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

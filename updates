@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+import argparse
+import subprocess
+import sys
+import os
+from termcolor import colored
+
+def get_terminal_width():
+    return os.get_terminal_size().columns
+
+def print_centered_in_frame(text, color):
+    width = get_terminal_width() - 2  # Subtracting 2 for the side borders
+    padding = (width - len(text)) // 2
+    top_border = colored("╭" + "─" * (width) + "╮", "blue", attrs=['bold'])
+    bottom_border = colored("╰" + "─" * (width) + "╯", "blue", attrs=['bold'])
+    side_border = colored("│", "blue", attrs=['bold'])
+    print(f"\n{top_border}\n{side_border}{colored(' ' * padding + text + ' ' * padding, color, attrs=['bold'])}{side_border}\n{bottom_border}\n")
+
+def execute_command(cmd, force=False):
+    try:
+        print_centered_in_frame(f"🚀 Executing: {cmd}", "yellow")
+        subprocess.run(cmd, shell=True, check=True)
+        print_centered_in_frame("✅ Success!", "green")
+        return True
+    except subprocess.CalledProcessError as e:
+        print_centered_in_frame(f"❌ Command failed: {e}", "red")
+        return force  # If force is True, continue despite the error
+
+
+def execute_update(commands, force):
+    success = False
+    for cmd in commands:
+        if execute_command(cmd, force):
+            success = True
+    return success
+
+
+
+def main():
+    print_centered_in_frame("System & Package Updater", "yellow")
+
+    parser = argparse.ArgumentParser(description=colored("Update system and packages using various methods.", "blue", attrs=['bold']))
+    parser.add_argument("-p", help="Update package lists.", action="store_true")
+    parser.add_argument("-u", help="Upgrade packages.", action="store_true")
+    parser.add_argument("-s", help="Update system.", action="store_true")
+    parser.add_argument("-d", help="Update distribution.", action="store_true")
+    parser.add_argument("-c", help="Refresh ClamAV database.", action="store_true")
+    parser.add_argument("-f", help="Force updates, ignoring errors.", action="store_true")
+
+    args = parser.parse_args()
+    force = args.f
+
+    if args.p:
+        print_centered_in_frame("🔄 Updating Package Lists", "cyan")
+        success = execute_update([
+            "nala update",
+            "snap refresh",
+            "flatpak update -y"
+        ], force)
+        if not success:
+            print_centered_in_frame("❌ Error: Could not update package lists.", "red")
+
+    if args.u:
+        print_centered_in_frame("⬆️ Upgrading Packages", "cyan")
+        success = execute_update([
+            "nala upgrade -y",
+            "snap refresh",
+            "flatpak update -y"
+        ], force)
+        if not success:
+            print_centered_in_frame("❌ Error: Could not upgrade packages.", "red")
+
+    if args.s:
+        print_centered_in_frame("🛠️ Updating System", "cyan")
+        success = execute_update([
+            "apt update && apt upgrade -y",
+            "apt dist-upgrade -y"
+        ], force)
+        if not success:
+            print_centered_in_frame("❌ Error: Could not update system.", "red")
+
+    if args.d:
+        print_centered_in_frame("🔄 Updating Distribution", "cyan")
+        success = execute_update([
+            "do-release-upgrade"
+        ], force)
+        if not success:
+            print_centered_in_frame("❌ Error: Could not update distribution.", "red")
+
+    if args.c:
+        print_centered_in_frame("🛡️ Refreshing ClamAV Database", "cyan")
+        success = execute_update([
+            "systemctl stop clamav-freshclam",
+            "freshclam",
+            "systemctl start clamav-freshclam",
+        ], force)
+        if not success:
+            print_centered_in_frame("❌ Error: Could not refresh ClamAV database.", "red")
+
+if __name__ == "__main__":
+    main()

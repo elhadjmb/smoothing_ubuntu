@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+import argparse
+import subprocess
+import sys
+import os
+from termcolor import colored
+
+def get_terminal_width():
+    return os.get_terminal_size().columns
+
+def print_centered_in_frame(text, color):
+    width = get_terminal_width() - 2  # Subtracting 2 for the side borders
+    padding = (width - len(text)) // 2
+    top_border = colored("╭" + "─" * (width) + "╮", "blue", attrs=['bold'])
+    bottom_border = colored("╰" + "─" * (width) + "╯", "blue", attrs=['bold'])
+    side_border = colored("│", "blue", attrs=['bold'])
+    print(f"\n{top_border}\n{side_border}{colored(' ' * padding + text + ' ' * padding, color, attrs=['bold'])}{side_border}\n{bottom_border}\n")
+
+def execute_command(cmd, force=False):
+    try:
+        print_centered_in_frame(f"🚀 Executing: {cmd}", "yellow")
+        subprocess.run(cmd, shell=True, check=True)
+        print_centered_in_frame("✅ Success!", "green")
+        return True
+    except subprocess.CalledProcessError as e:
+        print_centered_in_frame(f"❌ Command failed: {e}", "red")
+        return force  # If force is True, continue despite the error
+
+def remove_packages(package_names, flags, force, clean, autoremove, purge, dry_run, info):
+    package_managers = [
+        {"name": "nala", "remove": "remove", "clean": "clean", "autoremove": "autoremove", "list": "list", "purge": "purge", "info": "show", "yes_flag": "-y"},
+        {"name": "snap", "remove": "remove", "clean": None, "autoremove": None, "list": "list", "purge": None, "info": "info", "yes_flag": None},
+        {"name": "flatpak", "remove": "uninstall", "clean": None, "autoremove": None, "list": "list", "purge": None, "info": "info", "yes_flag": "-y"}
+    ]
+
+    packages_str = ' '.join(package_names)
+    success = False
+
+    for pm in package_managers:
+        cmd_flags = pm["yes_flag"] if flags and pm["yes_flag"] else ""
+
+        if dry_run:
+            print_centered_in_frame(f"🔍 Dry Run: Would execute sudo {pm['name']} {pm['remove']} {cmd_flags} {packages_str}", "magenta")
+            continue
+
+        if info:
+            info_cmd = f"{pm['name']} {pm['info']} {packages_str}"
+            execute_command(info_cmd, force)
+            continue
+
+        cmd = f"sudo {pm['name']} {pm['remove']} {cmd_flags} {packages_str}"
+        if execute_command(cmd, force):
+            success = True
+
+        if autoremove and pm['autoremove']:
+            autoremove_cmd = f"sudo {pm['name']} {pm['autoremove']} {cmd_flags}"
+            execute_command(autoremove_cmd, force)
+
+        if purge and pm['purge']:
+            purge_cmd = f"sudo {pm['name']} {pm['purge']} {cmd_flags} {packages_str}"
+            execute_command(purge_cmd, force)
+
+        if clean and pm['clean']:
+            clean_cmd = f"sudo {pm['name']} {pm['clean']}"
+            execute_command(clean_cmd, force)
+
+    return success
+
+def main():
+    print_centered_in_frame("Package Remover", "yellow")
+    parser = argparse.ArgumentParser(description=colored("Remove packages using various package managers.", "blue", attrs=['bold']))
+    parser.add_argument("package_names", nargs='+', help="Name(s) of the package(s) to remove.")
+    parser.add_argument("-y", help="Automatically say yes to prompts.", action="store_true")
+    parser.add_argument("-f", help="Force removal, ignoring errors.", action="store_true")
+    parser.add_argument("-c", help="Clean up cache after removal.", action="store_true")
+    parser.add_argument("-a", help="Autoremove unused dependencies after removal.", action="store_true")
+    parser.add_argument("-l", help="List all installed packages.", action="store_true")
+    parser.add_argument("-p", help="Purge configuration files along with the package.", action="store_true")
+    parser.add_argument("-d", help="Dry run to show what would be done.", action="store_true")
+    parser.add_argument("-i", help="Show detailed information about a package.", action="store_true")
+
+
+
+    args = parser.parse_args()
+    flags = "-y" if args.y else ""
+    force = args.f
+    clean = args.c
+    autoremove = args.a
+    purge = args.p
+    dry_run = args.d
+    info = args.i
+
+    print_centered_in_frame(f"🎯 Action: Remove", "cyan")
+    print_centered_in_frame(f"📦 Package(s): {', '.join(args.package_names)}", "cyan")
+
+    success = remove_packages(args.package_names, flags, force, clean, autoremove, purge, dry_run, info)
+    if not success:
+        print_centered_in_frame(f"❌ Error: Could not remove {', '.join(args.package_names)}.", "red")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
