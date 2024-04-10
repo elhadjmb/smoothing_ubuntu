@@ -9,8 +9,6 @@
 - **updates**: Facilitates system and package updates.
 
 ## Prerequisites
-- Python 3
-- `termcolor` Python package
 - Ubuntu system (20.04 or later recommended)
 
 ## Installation
@@ -19,10 +17,10 @@
    git clone https://github.com/elhadjmb/smoothing_ubuntu.git
    cd smoothing_ubuntu
    ```
-2. Make the scripts executable and copy them to `/usr/local/bin`:
+2. Run the `setup.sh` script to install the required dependencies:
    ```bash
-   chmod +x installs removes updates
-   sudo cp installs removes updates /usr/local/bin
+   chmod +x setup.sh
+   sudo setup.sh
    ```
 
 ## Usage and Examples
